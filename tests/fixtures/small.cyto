@@ -1,0 +1,11 @@
+{
+  "format": "cyto",
+  "version": 1,
+  "samples": ["a.fcs", "b.fcs"],
+  "compensation": { "enabled": true, "channels": ["FL1-A", "FL2-A"], "matrix": [[1, 0.2], [0, 1]] },
+  "gates": [
+    { "id": 1, "parent": 0, "name": "Small", "type": "rectangle", "x": "FSC-A", "y": "SSC-A",
+      "xScale": "linear", "yScale": "linear", "points": [[30000, 5000], [80000, 50000]] },
+    { "id": 2, "parent": 1, "name": "CD4", "type": "range", "x": "FL1-A", "xScale": "arcsinh", "points": [2.6, 30] }
+  ]
+}

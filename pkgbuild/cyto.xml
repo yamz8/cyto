@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-cyto">
+    <comment>Cyto workspace</comment>
+    <sub-class-of type="application/json"/>
+    <glob pattern="*.cyto"/>
+  </mime-type>
+  <mime-type type="application/vnd.isac.fcs">
+    <comment>Flow cytometry data (FCS)</comment>
+    <glob pattern="*.fcs"/>
+    <magic priority="50">
+      <match type="string" value="FCS" offset="0"/>
+    </magic>
+  </mime-type>
+</mime-info>

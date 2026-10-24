@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=Cyto
+Name[da]=Cyto
+Comment=Gate flow cytometry FCS files and export the statistics
+Comment[da]=Gate flowcytometri-FCS-filer, og eksportér statistikken
+GenericName=Flow cytometry gating
+GenericName[da]=Flowcytometri-gating
+Exec=cyto open %F
+Icon=cyto
+Terminal=false
+Categories=Science;Biology;
+Keywords=flow cytometry;FCS;gating;compensation;FACS;cytometer;
+MimeType=application/x-cyto;application/vnd.isac.fcs;
+StartupWMClass=cyto

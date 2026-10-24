@@ -1,0 +1,24 @@
+pkgname=cyto
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Gate flow cytometry FCS files and export the statistics'
+arch=('x86_64' 'aarch64')
+license=('MIT')
+depends=('qt6-base' 'qt6-declarative' 'qt6-wayland' 'xdg-desktop-portal')
+makedepends=('gcc' 'make')
+source=()
+sha256sums=()
+
+build() {
+  cd "$startdir/.."
+  ./bin/build
+}
+
+package() {
+  cd "$startdir/.."
+  install -Dm755 build/cyto "$pkgdir/usr/bin/cyto"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 "$startdir/cyto.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/cyto.svg"
+  install -Dm644 "$startdir/cyto.desktop" "$pkgdir/usr/share/applications/cyto.desktop"
+  install -Dm644 "$startdir/cyto.xml" "$pkgdir/usr/share/mime/packages/cyto.xml"
+}

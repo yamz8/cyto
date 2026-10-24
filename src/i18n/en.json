@@ -1,0 +1,4 @@
+{
+  "%Ln events": { "one": "%Ln event", "other": "%Ln events" },
+  "%1: %Ln events": { "one": "%1: %Ln event", "other": "%1: %Ln events" }
+}
