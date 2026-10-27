@@ -256,6 +256,9 @@ private slots:
         QCOMPARE(gate.type, Gate::Range);
         QCOMPARE(gate.parent, small);
         QCOMPARE(s.backend->currentStats(gate.id).count, 3600);
+        // The far bound stays finite on every scale, so it survives a switch and a save.
+        QVERIFY(gate.isValid());
+        QVERIFY(std::isfinite(Scales::inverse(gate.xScale, std::max(gate.points[0].x(), gate.points[1].x()))));
         s.shot("histogram");
     }
 
@@ -365,6 +368,29 @@ private slots:
         s.waitForDialog(true);
         QVERIFY(s.shown("compensation"));
         s.shot("compensation");
+    }
+
+    // Focusing a matrix cell and leaving it must not round the value it shows.
+    void leavingAMatrixCellKeepsItsFullValue() {
+        Session s;
+        s.backend->setCompensationValue(0, 1, 0.123456);
+        const bool dirtyBefore = s.backend->dirty();
+        s.key(Qt::Key_C, Qt::ShiftModifier, "C");
+        s.waitForDialog(true);
+        QQuickItem *field = nullptr;
+        QList<QQuickItem *> pending{s.window->contentItem()};
+        while (!pending.isEmpty() && !field) {
+            QQuickItem *item = pending.takeFirst();
+            if (item->isVisible() && item->property("text").toString() == "0.1235" && item->property("validator").isValid())
+                field = item;
+            pending.append(item->childItems());
+        }
+        QVERIFY(field);
+        field->forceActiveFocus();
+        s.settle();
+        s.key(Qt::Key_Tab);
+        QCOMPARE(s.backend->analysis().compensation.at(0, 1), 0.123456);
+        QCOMPARE(s.backend->dirty(), dirtyBefore);
     }
 
     void helpListsTheShortcuts() {

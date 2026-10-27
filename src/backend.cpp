@@ -218,6 +218,8 @@ void Backend::setXScale(int scale) {
     if (m_view.x.isEmpty() || scale < 0 || scale > 2 || scale == xScale())
         return;
     m_analysis.scales.insert(m_view.x, Scale(scale));
+    // Scales are saved in the workspace, so changing one is a change to save.
+    setDirty(true);
     emit viewChanged();
     emit plotChanged();
 }
@@ -226,6 +228,7 @@ void Backend::setYScale(int scale) {
     if (m_view.y.isEmpty() || scale < 0 || scale > 2 || scale == yScale())
         return;
     m_analysis.scales.insert(m_view.y, Scale(scale));
+    setDirty(true);
     emit viewChanged();
     emit plotChanged();
 }
@@ -446,6 +449,9 @@ void Backend::removeSample(int index) {
     if (index < 0 || index >= m_analysis.samples.size())
         return;
     m_analysis.removeSample(index);
+    // Stay on the same file when one above it goes.
+    if (index < m_currentSample)
+        --m_currentSample;
     if (m_currentSample >= m_analysis.samples.size())
         m_currentSample = int(m_analysis.samples.size()) - 1;
     setDirty(true);
@@ -662,10 +668,11 @@ void Backend::deleteGate(int id) {
     QVector<int> removed = m_analysis.descendants(id);
     removed << id;
     m_analysis.gates.removeIf([&](const Gate &g) { return removed.contains(g.id); });
-    if (removed.contains(m_currentPopulation)) {
-        m_currentPopulation = parent;
-        emit currentPopulationChanged();
-    }
+    if (removed.contains(m_currentPopulation))
+        setCurrentPopulation(parent);
+    // A new gate can reuse a deleted one's id; it mustn't inherit its axes.
+    for (int gone : removed)
+        m_views.remove(gone);
     m_selectedGate = 0;
     emit selectedGateChanged();
     gatesEdited();

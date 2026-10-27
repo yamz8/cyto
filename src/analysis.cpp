@@ -181,8 +181,8 @@ const std::vector<char> &Analysis::members(int sample, int population) {
     if (!g) {
         result.assign(s.events, 1);
     } else {
-        // Copied, since computing the parent may grow the hash under us.
-        const std::vector<char> parent = members(sample, g->parent);
+        // Safe to hold: unordered_map keeps references valid as entries are added.
+        const std::vector<char> &parent = members(sample, g->parent);
         result.assign(s.events, 0);
         const int xi = s.channelIndex(g->x), yi = g->isOneDimensional() ? xi : s.channelIndex(g->y);
         if (xi >= 0 && yi >= 0) {
@@ -226,7 +226,8 @@ double Analysis::median(int sample, int population, const QString &channel) {
     std::vector<float> picked;
     for (qsizetype e = 0; e < s.events; ++e)
         if (mine[e])
-            picked.push_back(data[e * stride + index]);
+            if (std::isfinite(data[e * stride + index]))
+                picked.push_back(data[e * stride + index]);
     if (picked.empty())
         return std::nan("");
     const size_t middle = picked.size() / 2;
@@ -252,7 +253,12 @@ QPair<double, double> Analysis::range(const QString &channel, Scale scale) {
         const auto &data = values(i);
         const qsizetype step = std::max<qsizetype>(1, s.events / 50000);
         for (qsizetype e = 0; e < s.events; e += step)
-            picked.push_back(Scales::forward(scale, data[e * s.channels.size() + index]));
+        {
+            // Some instruments write NaN for events they couldn't measure.
+            const double v = Scales::forward(scale, data[e * s.channels.size() + index]);
+            if (std::isfinite(v))
+                picked.push_back(v);
+        }
     }
     double low = 0, high = 1;
     if (!picked.empty()) {

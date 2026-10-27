@@ -5,6 +5,7 @@
 #include <QTemporaryDir>
 #include <QtEndian>
 #include <QtTest>
+#include <limits>
 
 #include "analysis.h"
 #include "backend.h"
@@ -113,6 +114,39 @@ private slots:
         bytes.chop(20);
         QVERIFY(!Fcs::parse(bytes, &error));
         QVERIFY(error.contains("truncated"));
+    }
+
+    // A huge $TOT must be refused, not overflow past the size check.
+    void fcsRefusesAnEventCountThatOverflows() {
+        const QByteArray text = "/$BYTEORD/1,2,3,4/$DATATYPE/F/$MODE/L/$PAR/4/$TOT/4611686018427387904/"
+                                "$P1B/32/$P1N/A/$P2B/32/$P2N/B/$P3B/32/$P3N/C/$P4B/32/$P4N/D/";
+        const qint64 textStart = 58, dataStart = textStart + text.size();
+        const QByteArray data(64, '\0');
+        auto offset = [](qint64 v) { return QByteArray::number(v).rightJustified(8, ' '); };
+        const QByteArray file = "FCS3.1    " + offset(textStart) + offset(dataStart - 1) + offset(dataStart)
+                              + offset(dataStart + data.size() - 1) + offset(0) + offset(0) + text + data;
+        QString error;
+        QVERIFY(!Fcs::parse(file, &error));
+        QVERIFY(error.contains("truncated"));
+    }
+
+    // Unmeasured events come as NaN; they must not upset the axes or the medians.
+    void nanEventsAreLeftOutOfRangesAndMedians() {
+        FcsSample sample = testSample("nan", 100, 100, 0.5);
+        sample.spillover = {};
+        for (qsizetype e = 0; e < sample.events; e += 3)
+            sample.data[e * 4] = std::numeric_limits<float>::quiet_NaN();
+        Analysis analysis;
+        analysis.addSample(std::make_shared<const FcsSample>(sample));
+        const auto range = analysis.range("FSC-A", Scale::Linear);
+        QVERIFY(std::isfinite(range.first) && std::isfinite(range.second));
+        QVERIFY(range.second > 100000);
+        QVERIFY(std::isfinite(analysis.median(0, 0, "FSC-A")));
+    }
+
+    void gatesRefuseInfinitePoints() {
+        Gate gate = rectangle(1, 0, "x", "y", {0, 0}, {std::numeric_limits<double>::infinity(), 1});
+        QVERIFY(!gate.isValid());
     }
 
     void spilloverParses() {
@@ -307,6 +341,54 @@ private slots:
         backend.redo();
         QVERIFY(backend.analysis().gates.isEmpty());
         QVERIFY(!backend.canRedo());
+    }
+
+    void changingAScaleIsAChangeToSave() {
+        QTemporaryDir dir;
+        FakePicker picker;
+        Backend backend(&picker);
+        backend.openPaths({writeTestSample(dir.filePath("a.fcs"), testSample("a", 10, 10, 0.5))});
+        picker.path = dir.filePath("a.cyto");
+        backend.saveWorkspace();
+        QVERIFY(!backend.dirty());
+        backend.cycleXScale();
+        QVERIFY(backend.dirty());
+    }
+
+    // Removing a sample above the current one keeps showing the same file.
+    void removingASampleKeepsTheCurrentOne() {
+        QTemporaryDir dir;
+        FakePicker picker;
+        Backend backend(&picker);
+        backend.openPaths({writeTestSample(dir.filePath("a.fcs"), testSample("a", 10, 10, 0.5)),
+                           writeTestSample(dir.filePath("b.fcs"), testSample("b", 10, 10, 0.5)),
+                           writeTestSample(dir.filePath("c.fcs"), testSample("c", 10, 10, 0.5))});
+        backend.setCurrentSample(1);
+        backend.removeSample(0);
+        QCOMPARE(backend.samples()[backend.currentSample()].toMap()["name"].toString(), QString("b"));
+        backend.removeSample(1);
+        QCOMPARE(backend.samples()[backend.currentSample()].toMap()["name"].toString(), QString("b"));
+    }
+
+    void deletedGatesTakeTheirAxesWithThem() {
+        QTemporaryDir dir;
+        FakePicker picker;
+        Backend backend(&picker);
+        backend.openPaths({writeTestSample(dir.filePath("a.fcs"), testSample("a", 600, 400, 0.25))});
+        const int gate = backend.addGate(Gate::Rectangle, {{30000, 5000}, {80000, 50000}});
+        backend.openGate(gate);
+        backend.setXChannel("FL1-A");
+        backend.setYChannel("FL2-A");
+        // Deleting the population you're in shows the parent on its own axes.
+        backend.deleteGate(gate);
+        QCOMPARE(backend.currentPopulation(), 0);
+        QCOMPARE(backend.xChannel(), QString("FSC-A"));
+        QCOMPARE(backend.yChannel(), QString("SSC-A"));
+        // A new gate with the freed id opens on the axes it was drawn on.
+        const int again = backend.addGate(Gate::Rectangle, {{30000, 5000}, {80000, 50000}});
+        QCOMPARE(again, gate);
+        backend.openGate(again);
+        QCOMPARE(backend.xChannel(), QString("FSC-A"));
     }
 
     void backendSavesAtomicallyAndReopens() {

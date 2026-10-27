@@ -179,16 +179,19 @@ QPointF PlotItem::gatePoint(const QPointF &pixel) const {
     const QRectF area = plotArea();
     QPointF scaled = fromPixel(QPointF(std::clamp(pixel.x(), area.left(), area.right()),
                                        std::clamp(pixel.y(), area.top(), area.bottom())));
-    const double far = 1000, xSpan = m_x.high - m_x.low, ySpan = m_y.high - m_y.low;
+    // Far enough out to take in anything off scale, near enough that the
+    // value stays finite in raw units when the gate is shown on another
+    // scale: a thousand spans on a linear axis, six decades on log or arcsinh.
+    auto far = [](const Axis &axis) { return axis.scale == Scale::Linear ? (axis.high - axis.low) * 1000 : 6.0; };
     if (pixel.x() <= area.left() + 1)
-        scaled.setX(m_x.low - xSpan * far);
+        scaled.setX(m_x.low - far(m_x));
     else if (pixel.x() >= area.right() - 1)
-        scaled.setX(m_x.high + xSpan * far);
+        scaled.setX(m_x.high + far(m_x));
     if (!m_histogram) {
         if (pixel.y() >= area.bottom() - 1)
-            scaled.setY(m_y.low - ySpan * far);
+            scaled.setY(m_y.low - far(m_y));
         else if (pixel.y() <= area.top() + 1)
-            scaled.setY(m_y.high + ySpan * far);
+            scaled.setY(m_y.high + far(m_y));
     }
     return scaled;
 }
@@ -271,8 +274,12 @@ void PlotItem::renderDensity(const std::vector<float> &values, const std::vector
     for (size_t e = 0; e < members.size(); ++e) {
         if (!members[e])
             continue;
-        const int bx = std::clamp(int((Scales::forward(m_x.scale, values[e * stride + xi]) - m_x.low) * xs), 0, w - 1);
-        const int by = std::clamp(int((Scales::forward(m_y.scale, values[e * stride + yi]) - m_y.low) * ys), 0, h - 1);
+        const double fx = (Scales::forward(m_x.scale, values[e * stride + xi]) - m_x.low) * xs;
+        const double fy = (Scales::forward(m_y.scale, values[e * stride + yi]) - m_y.low) * ys;
+        if (!std::isfinite(fx) || !std::isfinite(fy))
+            continue;
+        // Clamped as doubles: converting an out-of-range double to int is undefined.
+        const int bx = int(std::clamp(fx, 0.0, w - 1.0)), by = int(std::clamp(fy, 0.0, h - 1.0));
         ++counts[size_t(h - 1 - by) * w + bx];
         ++shown;
     }
@@ -302,7 +309,10 @@ void PlotItem::renderHistogram(const std::vector<float> &values, const std::vect
     for (size_t e = 0; e < members.size(); ++e) {
         if (!members[e])
             continue;
-        ++m_bins[std::clamp(int((Scales::forward(m_x.scale, values[e * stride + xi]) - m_x.low) * xs), 0, bins - 1)];
+        const double fx = (Scales::forward(m_x.scale, values[e * stride + xi]) - m_x.low) * xs;
+        if (!std::isfinite(fx))
+            continue;
+        ++m_bins[int(std::clamp(fx, 0.0, bins - 1.0))];
         ++shown;
     }
     if (!shown) {
