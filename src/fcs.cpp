@@ -177,7 +177,8 @@ std::optional<FcsSample> Fcs::parse(const QByteArray &bytes, QString *error) {
         eventBytes += b / 8;
     const qint64 available = dataEnd >= dataStart && dataStart > 0 ? qMin<qint64>(dataEnd - dataStart + 1, bytes.size() - dataStart) : 0;
     qint64 events = k.contains("$TOT") ? k.value("$TOT").toLongLong() : available / eventBytes;
-    if (events < 0 || events * eventBytes > available) {
+    // Compared by division, so a huge $TOT can't overflow past the check.
+    if (events < 0 || events > available / eventBytes) {
         fail(error, tr("The file is truncated: it lists %1 events but holds fewer.").arg(events));
         return std::nullopt;
     }

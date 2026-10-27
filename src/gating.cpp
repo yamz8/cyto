@@ -50,6 +50,10 @@ QString Gate::typeId(Type type) {
 bool Gate::isValid() const {
     if (x.isEmpty() || (!isOneDimensional() && y.isEmpty()))
         return false;
+    // JSON can't hold infinities; they would come back as zero.
+    for (const QPointF &p : points)
+        if (!std::isfinite(p.x()) || !std::isfinite(p.y()))
+            return false;
     return type == Polygon ? points.size() >= 3 : points.size() == 2;
 }
 

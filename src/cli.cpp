@@ -96,7 +96,8 @@ int info(const QStringList &arguments) {
         std::vector<float> values;
         const qsizetype step = std::max<qsizetype>(1, sample->events / 100000);
         for (qsizetype e = 0; e < sample->events; e += step)
-            values.push_back(sample->value(e, c));
+            if (std::isfinite(sample->value(e, c)))
+                values.push_back(sample->value(e, c));
         std::sort(values.begin(), values.end());
         auto percentile = [&](double p) { return values.empty() ? 0.0 : double(values[size_t(p * (values.size() - 1))]); };
         channels.append(QJsonObject{{"name", sample->channels[c]},

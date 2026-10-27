@@ -131,8 +131,11 @@ Dialog {
                                 color: cell.row === cell.column ? "#8a8a94" : "#e4e4ea"
                                 validator: DoubleValidator { locale: Qt.locale().name }
                                 onEditingFinished: {
+                                    // Leaving a cell untouched keeps the full value; the
+                                    // field only shows it rounded.
+                                    const current = backend.compensationMatrix[cell.row * root.n + cell.column]
                                     const value = Number.fromLocaleString(Qt.locale(), text)
-                                    if (!isNaN(value))
+                                    if (text !== root.format(current) && !isNaN(value))
                                         backend.setCompensationValue(cell.row, cell.column, value)
                                     text = Qt.binding(() => root.format(backend.compensationMatrix[cell.row * root.n + cell.column]))
                                 }
